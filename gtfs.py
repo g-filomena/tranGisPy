@@ -64,14 +64,21 @@ def GTFS_to_gpd(companies, crs, input_path, filter_service_strings = [], route_s
                 stop_times = stop_times[(stop_times['arrival_time'] >= times[0]) & (stop_times['arrival_time'] < times[1])]
                 trips = trips[trips.trip_id.isin(stop_times.trip_id.unique())]
             
-            trips, stop_times = filter_week_days_trips(trips, calendar, stop_times = stop_times, filter_strings = filter_service_strings[n])            
+            if not filter_service_strings:
+                company_filter_strings = []
+            else:
+                company_filter_strings = filter_service_strings[n]
+                
+            trips, stop_times = filter_week_days_trips(trips, calendar, stop_times = stop_times, filter_strings = company_filter_strings)            
             trips = assign_duration(trips, stop_times)                              
             
             # If shape geometries, form geometries from the shapes.txt file.
             if (route_shape_geometries):
-                shapes = pd.read_csv(gtfs_zip.open("shapes.txt"), low_memory=False)
-                trips = form_geometries_from_shapes(trips, shapes)
-            
+                try:
+                    shapes = pd.read_csv(gtfs_zip.open("shapes.txt"), low_memory=False)
+                    trips = form_geometries_from_shapes(trips, shapes)
+                except:
+                    trips = form_geometries_from_stops(trips, stop_times)
             # Otherwise, form geometries from stops
             else:         
                 trips = form_geometries_from_stops(trips, stop_times)
@@ -80,7 +87,9 @@ def GTFS_to_gpd(companies, crs, input_path, filter_service_strings = [], route_s
             trips = trips[['route_id', 'service_id', 'trip_id', 'shape_id', 'wkt', 'duration']].copy()
                
             # frequency trips:  
-            if len(trips.trip_id.unique()) == len(trips.service_id.unique()):
+            if len(trips.trip_id.unique()) == len(trips.trip_id):
+                trips = trips.groupby(['route_id', 'wkt'], as_index = False).agg({'trip_id': 'count','duration' : 'mean'})
+            elif len(trips.trip_id.unique()) == len(trips.service_id.unique()):
                 trips = trips.groupby(['route_id', 'wkt', 'service_id'], as_index = False).agg({'trip_id': 'count','duration' : 'mean'})
             else:
                 trips = trips.groupby(['route_id', 'wkt'], as_index = False).agg({'trip_id': 'count', 'duration' : 'mean'})
@@ -137,8 +146,13 @@ def GTFS_to_pd(companies, input_path, filter_service_strings = [], times = [], p
             trips_tmp = trips_tmp.merge(routes_tmp, on = 'route_id')
             stop_times_tmp = stop_times_tmp.merge(trips_tmp[['trip_id','route_id', 'route_type']], on = 'trip_id')
            
+            if not filter_service_strings:
+                company_filter_strings = []
+            else:
+                company_filter_strings = filter_service_strings[n]
+           
             trips_tmp, stop_times_tmp = filter_week_days_trips(trips_tmp, calendar, stop_times = stop_times_tmp, 
-                                                               filter_strings = filter_service_strings[n])                       
+                                                               filter_strings = company_filter_strings)                       
 
             
             trips_tmp = trips_tmp[['route_id', 'service_id', 'trip_id', 'direction_id','route_type']]
@@ -213,9 +227,9 @@ def filter_week_days_trips(trips, calendar = pd.DataFrame(), stop_times = None, 
     if len(calendar) > 0:   
         week_services = calendar[calendar.wednesday == 1].service_id.unique()
         return trips[trips.service_id.isin(week_services)], stop_times
-    
+    elif not filter_strings:  
+        return trips, stop_times
     elif len(filter_strings)>0:
-        
         trips = trips.sort_values(by = 'route_type', ascending = True)
         route_types = trips.route_type.unique()
         ids = []
