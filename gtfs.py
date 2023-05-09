@@ -7,7 +7,6 @@ from zipfile import ZipFile, Path
 import datetime
 import matplotlib as mpl
 from shapely.wkt import loads
-import cityImage as ci
 import math
 
 def GTFS_to_gpd(companies, crs, input_path, filter_service_strings = [], route_shape_geometries = False, 
