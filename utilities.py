@@ -5,6 +5,8 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 import math
 
+import cityImage as ci
+
 def create_grid_hexagons(gdf, side_length = 150):
     """
     Create a grid of hexagons, for a given GeoDataFrame's extent.
@@ -178,3 +180,13 @@ def assign_inbound_outbound(routes_gdf):
     routes_gdf['direction'].fillna('outbound', inplace=True)
     routes_gdf.drop('duplicate', inplace = True, axis = 1)
     return(routes_gdf)
+    
+    
+def fill_grid(grid, column):
+    grid = grid.copy()
+    not_empty = grid[~grid[column].isna()]
+    empty = grid[grid[column].isna()]
+
+    empty[column] = empty.geometry.apply(lambda row: not_empty.loc[ci.min_distance_geometry_gdf(row, not_empty)[1]][column])
+    grid.loc[grid[column].isna(), column] = empty[column]
+    return grid
