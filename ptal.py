@@ -39,7 +39,7 @@ def compute_ptal(polygons_gdf, stops, ig_graph, ptal_params = {'max_dist_bus': 5
     cutoff = max_dist_rail*2
     
     # Computing Awaiting Time
-    stops['k'] = [2 if route_type == 0 else 0.7 for route_type in stops['route_type']]
+    stops['k'] = [2 if route_type == 3 else 0.7 for route_type in stops['route_type']]
     stops['swt'] = 0.5*(60/stops['freq'])
     stops['awt'] = stops['swt']+stops['k']
         
@@ -47,6 +47,7 @@ def compute_ptal(polygons_gdf, stops, ig_graph, ptal_params = {'max_dist_bus': 5
         stops = stops[~stops.route_type.isin(route_types_to_disregard)].copy()
     if routeIDs_to_disregard:
         stops = stops[~stops.route_id.isin(routeIDs_to_disregard)].copy()
+    
     pt_stops_sindex = stops.sindex  
     
     def compute_polygon_ptal(centroid, centroid_nodeID):
