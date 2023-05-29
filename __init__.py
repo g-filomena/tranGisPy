@@ -2,6 +2,7 @@
 # Module: __init__.py
 # Description: 
 # License: MIT, see full license in LICENSE.txt
+# author: Gabriele Filomena
 ################################################################################
 
 from .gtfs import*
