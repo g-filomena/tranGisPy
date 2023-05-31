@@ -58,7 +58,7 @@ def compute_ptal(polygons_gdf, stops, ig_graph, ptal_params = {'max_dist_bus': 5
         if len(matches) < 1:
             return 0.0
         
-        matches = matches.drop_duplicates(subset=['route_id', 'stop_id', 'stop_name'], keep='first').reset_index(drop=True)
+        matches = matches.drop_duplicates(subset=['route_id', 'stop_id'], keep='first').reset_index(drop=True)
         targets = matches['node'].unique()
         walking_times = walking_time_to_stops(ig_graph, source = centroid_nodeID, stop_nodes = targets)     
         matches['wTime'] = [walking_times[matches.loc[ix].node] for ix in list(matches.index.values)]
