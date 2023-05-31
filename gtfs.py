@@ -289,5 +289,22 @@ def split_routes_at_stops(routes_gdf):
     
     return routes_gdf_split
 
+def compute_waiting_time(multiplex_nodes, multiplex_edges):
+    multiplex_nodes = multiplex_nodes.copy()
+    multiplex_edges = multiplex_edges.copy()
+
+    condition_nodes = ~multiplex_nodes.layer.isin(['ped', 'inter_layer'])
+    condition_edges = ~multiplex_edges.layer.isin(['ped', 'inter_layer'])
+    transport_edges = multiplex_edges[condition_edges]
     
+    multiplex_nodes.loc[condition_nodes,'freq'] = [transport_edges[(transport_edges.u == node)|
+                                                  (transport_edges.v == node)]['freq'].sum() 
+                                                  for node in multiplex_nodes[condition_nodes].m_nodeID]
+    # one direction only
+    multiplex_edges.loc[condition_edges,'freq_uH'] = [multiplex_nodes.loc[u].freq/2 for u in multiplex_edges[condition_edges].u]
+    multiplex_edges.loc[condition_edges,'waitTime'] = multiplex_edges[condition_edges]['freq_uH']/60 
+    multiplex_edges['waitTime'] = multiplex_edges['waitTime'].fillna(0.0)
+    multiplex_edges['time_wt'] = multiplex_edges['time']+multiplex_edges['waitTime']
+    
+    return multiplex_edges
     
