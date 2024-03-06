@@ -4,14 +4,15 @@ from tqdm import tqdm, tqdm_pandas
 tqdm.pandas()
 
 from .routing import walking_time_to_stops, from_nx_to_igraph
-from .utilities import min_distance_geometry_gdf
-import cityImage as ci
+from .utilities import min_distance_geometry_gdf, reset_index_graph_gdfs
+from .graph import multiGraph_fromGDF
+
 
 def prepare_network_for_PTAL(nodes_gdf, edges_gdf, stops, grid):
     
-    nodes_gdf, edges_gdf = ci.reset_index_graph_gdfs(nodes_gdf, edges_gdf, nodeID = "nodeID")
+    nodes_gdf, edges_gdf = reset_index_graph_gdfs(nodes_gdf, edges_gdf, nodeID = "nodeID")
     edges_gdf['length'] = edges_gdf.geometry.length
-    graph = ci.multiGraph_fromGDF(nodes_gdf, edges_gdf, 'nodeID')
+    graph = multiGraph_fromGDF(nodes_gdf, edges_gdf, 'nodeID')
     stops['node'] = stops.geometry.apply(lambda row: min_distance_geometry_gdf(row, nodes_gdf)[1])
     
     grid['centroid'] = grid['geometry'].centroid
