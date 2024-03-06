@@ -5,8 +5,6 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 import math
 
-import cityImage as ci
-
 def create_grid_hexagons(gdf, side_length = 150):
     """
     Create a grid of hexagons, for a given GeoDataFrame's extent.
@@ -187,6 +185,29 @@ def fill_grid(grid, column):
     not_empty = grid[~grid[column].isna()]
     empty = grid[grid[column].isna()]
 
-    empty[column] = empty.geometry.apply(lambda row: not_empty.loc[ci.min_distance_geometry_gdf(row, not_empty)[1]][column])
+    empty[column] = empty.geometry.apply(lambda row: not_empty.loc[min_distance_geometry_gdf(row, not_empty)[1]][column])
     grid.loc[grid[column].isna(), column] = empty[column]
     return grid
+    
+def min_distance_geometry_gdf(geometry, gdf):
+    """
+    Given a geometry and a GeoDataFrame, it returns the minimum distance between the geometry and the GeoDataFrame. 
+    It provides also the index of the closest geometry in the GeoDataFrame.
+    
+    Parameters
+    ----------
+    geometry: Point, LineString or Polygon
+    
+    gdf: GeoDataFrame
+    
+    Returns:
+    ----------
+    distance, index: tuple
+        The closest distance from the geometry, and the index of the closest geometry in the gdf.
+    """
+    sindex = gdf.sindex
+    closest = sindex.nearest(geometry, return_distance = True)
+    iloc = closest[0][1][0]
+    distance = closest[1][0]
+    index = gdf.iloc[iloc].name 
+    return distance, index
