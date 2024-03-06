@@ -1,13 +1,14 @@
 import pandas as pd
 import geopandas as gpd
 import numpy as np
+import networkx as nx
 from shapely.geometry import Point, LineString
+from shapely.errors import ShapelyDeprecationWarning
 
 import warnings
-from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
 
-from .utilities import min_distance_geometry_gdf
+from .utilities import min_distance_geometry_gdf, reset_index_graph_gdfs
 
 def create_multiplex_gdfs(nodes_gdfs, edges_gdfs, index_main_network, Zs, layer_labels, transfer_distances, inter_layer_speed = 4000, keep_same_vertexes_edges = False):
     
@@ -44,6 +45,45 @@ def create_multiplex_gdfs(nodes_gdfs, edges_gdfs, index_main_network, Zs, layer_
     multiplex_nodes.drop(['nodeID', 'coordinates', 'height'], axis = 1, inplace = True)
     multiplex_nodes, multiplex_edges = reset_index_graph_gdfs(multiplex_nodes, multiplex_edges, nodeID = "m_nodeID")
     return multiplex_nodes, multiplex_edges
+
+def multiGraph_fromGDF(nodes_gdf, edges_gdf, nodeIDcolumn):
+    """
+    From two GeoDataFrames (nodes and edges), it creates a NetworkX.MultiGraph.
+    
+    Parameters
+    ----------
+    nodes_gdf: Point GeoDataFrame
+        The nodes (junctions) GeoDataFrame.
+    edges_gdf: LineString GeoDataFrame
+        The street segments GeoDataFrame.
+    nodeIDcolumn: string
+        Column name that indicates the node identifier column.
+    
+    Returns
+    -------
+    G: NetworkX.MultiGraph
+        The street network graph.
+    """
+    nodes_gdf.set_index(nodeIDcolumn, drop = False, inplace = True, append = False)
+    nodes_gdf.index.name = None
+    
+    Mg = nx.MultiGraph()   
+    Mg.add_nodes_from(nodes_gdf.index)
+    attributes = nodes_gdf.to_dict()
+      
+    for attribute_name in nodes_gdf.columns:
+        if nodes_gdf[attribute_name].apply(lambda x: type(x) == list).any(): 
+            continue 
+        # only add this attribute to nodes which have a non-null value for it
+        attribute_values = {k:v for k, v in attributes[attribute_name].items() if pd.notnull(v)}
+        nx.set_node_attributes(Mg, name=attribute_name, values=attribute_values)
+
+    # add the edges and attributes that are not u, v, key (as they're added separately) or null
+    for row in edges_gdf.itertuples():
+        attrs = {label: value for label, value in row._asdict().items() if (label not in ['u', 'v', 'key']) and (isinstance(value, list) or pd.notnull(value))}
+        Mg.add_edge(row.u, row.v, key=row.key, **attrs)
+      
+    return Mg
 
 def assign_z_coordinates(nodes_gdfs, edges_gdfs, layer_labels, Zs, keep_same_vertexes_edges = False):
     
@@ -166,37 +206,3 @@ def waiting_time(multiplex_nodes, multiplex_edges):
     multiplex_edges['time_wt'] = multiplex_edges['time']+multiplex_edges['waitTime']
     
     return multiplex_edges
-    
-def reset_index_graph_gdfs(nodes_gdf, edges_gdf, nodeID = "nodeID"):
-    """
-    The function simply resets the indexes of the two dataframes.
-     
-    Parameters
-    ----------
-    nodes_gdf: Point GeoDataFrame
-        Nodes (junctions) GeoDataFrame.
-    edges_gdf: LineString GeoDataFrame
-        Street segments GeoDataFrame.
-   
-    Returns
-    -------
-    nodes_gdf, edges_gdf: tuple
-        The junction and street segment GeoDataFrames.
-    """
-
-    edges_gdf = edges_gdf.rename(columns = {"u":"old_u", "v":"old_v"})
-    nodes_gdf["old_nodeID"] = nodes_gdf[nodeID].values.astype("int64")
-    nodes_gdf = nodes_gdf.reset_index(drop = True)
-    nodes_gdf[nodeID] = nodes_gdf.index.values.astype("int64")
-    
-    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_u", right_on="old_nodeID")
-    edges_gdf = edges_gdf.rename(columns = {nodeID:"u"})
-    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_v", right_on="old_nodeID")
-    edges_gdf = edges_gdf.rename(columns = {nodeID:"v"})
-
-    edges_gdf.drop(["old_u", "old_nodeID_x", "old_nodeID_y", "old_v"], axis = 1, inplace = True)
-    nodes_gdf.drop(["old_nodeID", "index"], axis = 1, inplace = True, errors = "ignore")
-    edges_gdf = edges_gdf.reset_index(drop=True)
-    edges_gdf["edgeID"] = edges_gdf.index.values.astype(int)
-        
-    return nodes_gdf, edges_gdf
