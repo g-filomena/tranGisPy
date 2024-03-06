@@ -1,6 +1,5 @@
 import pandas as pd
 import geopandas as gpd
-
 import numpy as np
 from shapely.geometry import Point, LineString
 
