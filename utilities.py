@@ -211,3 +211,37 @@ def min_distance_geometry_gdf(geometry, gdf):
     distance = closest[1][0]
     index = gdf.iloc[iloc].name 
     return distance, index
+    
+def reset_index_graph_gdfs(nodes_gdf, edges_gdf, nodeID = "nodeID"):
+    """
+    The function simply resets the indexes of the two dataframes.
+     
+    Parameters
+    ----------
+    nodes_gdf: Point GeoDataFrame
+        Nodes (junctions) GeoDataFrame.
+    edges_gdf: LineString GeoDataFrame
+        Street segments GeoDataFrame.
+   
+    Returns
+    -------
+    nodes_gdf, edges_gdf: tuple
+        The junction and street segment GeoDataFrames.
+    """
+
+    edges_gdf = edges_gdf.rename(columns = {"u":"old_u", "v":"old_v"})
+    nodes_gdf["old_nodeID"] = nodes_gdf[nodeID].values.astype("int64")
+    nodes_gdf = nodes_gdf.reset_index(drop = True)
+    nodes_gdf[nodeID] = nodes_gdf.index.values.astype("int64")
+    
+    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_u", right_on="old_nodeID")
+    edges_gdf = edges_gdf.rename(columns = {nodeID:"u"})
+    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_v", right_on="old_nodeID")
+    edges_gdf = edges_gdf.rename(columns = {nodeID:"v"})
+
+    edges_gdf.drop(["old_u", "old_nodeID_x", "old_nodeID_y", "old_v"], axis = 1, inplace = True)
+    nodes_gdf.drop(["old_nodeID", "index"], axis = 1, inplace = True, errors = "ignore")
+    edges_gdf = edges_gdf.reset_index(drop=True)
+    edges_gdf["edgeID"] = edges_gdf.index.values.astype(int)
+        
+    return nodes_gdf, edges_gdf
