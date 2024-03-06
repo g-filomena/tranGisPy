@@ -5,7 +5,7 @@ tqdm.pandas()
 
 from .routing import walking_time_to_stops, from_nx_to_igraph
 from .utilities import min_distance_geometry_gdf, reset_index_graph_gdfs
-from .graph import multiGraph_fromGDF
+from .multiLayer import multiGraph_fromGDF
 
 
 def prepare_network_for_PTAL(nodes_gdf, edges_gdf, stops, grid):
