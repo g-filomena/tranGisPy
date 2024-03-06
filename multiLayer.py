@@ -8,7 +8,7 @@ import warnings
 from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning) 
 
-import cityImage as ci
+from .utilities import min_distance_geometry_gdf
 
 def create_multiplex_gdfs(nodes_gdfs, edges_gdfs, index_main_network, Zs, layer_labels, transfer_distances, inter_layer_speed = 4000, keep_same_vertexes_edges = False):
     
@@ -43,7 +43,7 @@ def create_multiplex_gdfs(nodes_gdfs, edges_gdfs, index_main_network, Zs, layer_
                                                                          index_main_network)
     
     multiplex_nodes.drop(['nodeID', 'coordinates', 'height'], axis = 1, inplace = True)
-    multiplex_nodes, multiplex_edges = ci.reset_index_graph_gdfs(multiplex_nodes, multiplex_edges, nodeID = "m_nodeID")
+    multiplex_nodes, multiplex_edges = reset_index_graph_gdfs(multiplex_nodes, multiplex_edges, nodeID = "m_nodeID")
     return multiplex_nodes, multiplex_edges
 
 def assign_z_coordinates(nodes_gdfs, edges_gdfs, layer_labels, Zs, keep_same_vertexes_edges = False):
@@ -90,7 +90,7 @@ def create_inter_layer_links(nodes_gdfs, index_main_network, transfer_distances)
         
         nodes_gdf = nodes_gdf.copy()
         nodes_main_network = nodes_gdfs[index_main_network].copy()
-        dist = [ci.min_distance_geometry_gdf(node_geometry, nodes_main_network) for node_geometry in nodes_gdf.geometry]
+        dist = [min_distance_geometry_gdf(node_geometry, nodes_main_network) for node_geometry in nodes_gdf.geometry]
         closest = [(d[0], d[1]) for d in dist]
         nodes_gdf[['dist', 'id_main']] = pd.DataFrame(closest, index = nodes_gdf.index)
         
@@ -167,3 +167,37 @@ def waiting_time(multiplex_nodes, multiplex_edges):
     multiplex_edges['time_wt'] = multiplex_edges['time']+multiplex_edges['waitTime']
     
     return multiplex_edges
+    
+def reset_index_graph_gdfs(nodes_gdf, edges_gdf, nodeID = "nodeID"):
+    """
+    The function simply resets the indexes of the two dataframes.
+     
+    Parameters
+    ----------
+    nodes_gdf: Point GeoDataFrame
+        Nodes (junctions) GeoDataFrame.
+    edges_gdf: LineString GeoDataFrame
+        Street segments GeoDataFrame.
+   
+    Returns
+    -------
+    nodes_gdf, edges_gdf: tuple
+        The junction and street segment GeoDataFrames.
+    """
+
+    edges_gdf = edges_gdf.rename(columns = {"u":"old_u", "v":"old_v"})
+    nodes_gdf["old_nodeID"] = nodes_gdf[nodeID].values.astype("int64")
+    nodes_gdf = nodes_gdf.reset_index(drop = True)
+    nodes_gdf[nodeID] = nodes_gdf.index.values.astype("int64")
+    
+    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_u", right_on="old_nodeID")
+    edges_gdf = edges_gdf.rename(columns = {nodeID:"u"})
+    edges_gdf = pd.merge(edges_gdf, nodes_gdf[["old_nodeID", nodeID]], how="left", left_on="old_v", right_on="old_nodeID")
+    edges_gdf = edges_gdf.rename(columns = {nodeID:"v"})
+
+    edges_gdf.drop(["old_u", "old_nodeID_x", "old_nodeID_y", "old_v"], axis = 1, inplace = True)
+    nodes_gdf.drop(["old_nodeID", "index"], axis = 1, inplace = True, errors = "ignore")
+    edges_gdf = edges_gdf.reset_index(drop=True)
+    edges_gdf["edgeID"] = edges_gdf.index.values.astype(int)
+        
+    return nodes_gdf, edges_gdf
